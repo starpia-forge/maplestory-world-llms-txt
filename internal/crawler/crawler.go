@@ -133,7 +133,7 @@ func Run(headless bool, outPath, format string, clickDelay time.Duration, limit 
 		}
 
 		// 내용 수집 (백오프 포함)
-		var title, html string
+		var title string
 		err := withRetry(backoff, 5, func() error {
 			if err := waitVisible(ctx, contentContainerSel, 30*time.Second); err != nil {
 				return err
@@ -141,14 +141,13 @@ func Run(headless bool, outPath, format string, clickDelay time.Duration, limit 
 			if err := waitVisible(ctx, titleSel, 10*time.Second); err != nil {
 				return err
 			}
-			var t, h string
+			var t string
 			if err := chromedp.Run(ctx,
 				chromedp.Text(titleSel, &t, chromedp.NodeVisible, chromedp.ByQuery),
-				chromedp.InnerHTML(contentContainerSel, &h, chromedp.ByQuery),
 			); err != nil {
 				return err
 			}
-			title, html = strings.TrimSpace(t), h
+			title = strings.TrimSpace(t)
 			return nil
 		})
 		if err != nil {
@@ -172,7 +171,7 @@ func Run(headless bool, outPath, format string, clickDelay time.Duration, limit 
 			return nil
 		})
 
-		doc := Document{PostID: postID, Title: title, URL: curURL, InnerHTML: innerHTML, Content: html}
+		doc := Document{PostID: postID, Title: title, URL: curURL, InnerHTML: innerHTML, Content: ""}
 		docs = append(docs, doc)
 		visited[postID] = true
 		logger.LogParsedDoc(nil, doc.PostID, doc.Title, doc.URL)
