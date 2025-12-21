@@ -9,8 +9,8 @@ import (
 	"testing"
 )
 
-func sampleDocs() []Doc {
-	return []Doc{
+func sampleDocs() []Document {
+	return []Document{
 		{PostID: "1", Title: "Hello", URL: "https://example.com?a=1", Content: "Line1\nLine2"},
 		{PostID: "2", Title: "World, CSV", URL: "https://example.com?a=2", Content: "Comma, inside"},
 	}
@@ -22,7 +22,7 @@ func TestEncodeJSON_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EncodeJSON error: %v", err)
 	}
-	var got []Doc
+	var got []Document
 	if err := json.Unmarshal(data, &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}

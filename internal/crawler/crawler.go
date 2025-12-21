@@ -54,7 +54,7 @@ func Run(headless bool, outPath, format string, clickDelay time.Duration, limit 
 	}
 
 	visited := make(map[string]bool)
-	var docs []Doc
+	var docs []Document
 	backoff := NewBackoff(500*time.Millisecond, 20*time.Second, 2.0, 0.2)
 
 	// 1) 확장 단계: 하위 항목을 가진 모든 닫힌 요소를 더 이상 없을 때까지 클릭
@@ -158,7 +158,7 @@ func Run(headless bool, outPath, format string, clickDelay time.Duration, limit 
 			continue
 		}
 
-		doc := Doc{PostID: postID, Title: title, URL: curURL, Content: html}
+		doc := Document{PostID: postID, Title: title, URL: curURL, Content: html}
 		docs = append(docs, doc)
 		visited[postID] = true
 		logger.LogParsedDoc(nil, doc.PostID, doc.Title, doc.URL)
@@ -238,7 +238,7 @@ func isAllowedDocURL(raw string) bool {
 	return true
 }
 
-func saveOutput(path, format string, docs []Doc) error {
+func saveOutput(path, format string, docs []Document) error {
 	switch format {
 	case "json":
 		return SaveJSON(path, docs)

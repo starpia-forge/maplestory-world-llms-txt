@@ -8,12 +8,12 @@ import (
 )
 
 // EncodeJSON encodes the docs slice as a pretty JSON array.
-func EncodeJSON(docs []Doc) ([]byte, error) {
+func EncodeJSON(docs []Document) ([]byte, error) {
 	return json.MarshalIndent(docs, "", "  ")
 }
 
 // SaveJSON writes the docs slice as JSON to the given file path.
-func SaveJSON(path string, docs []Doc) error {
+func SaveJSON(path string, docs []Document) error {
 	data, err := EncodeJSON(docs)
 	if err != nil {
 		return err
@@ -22,7 +22,7 @@ func SaveJSON(path string, docs []Doc) error {
 }
 
 // EncodeCSV encodes the docs slice as CSV with header.
-func EncodeCSV(docs []Doc) ([]byte, error) {
+func EncodeCSV(docs []Document) ([]byte, error) {
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
 	// header
@@ -42,7 +42,7 @@ func EncodeCSV(docs []Doc) ([]byte, error) {
 }
 
 // SaveCSV writes the docs slice as CSV to the given file path.
-func SaveCSV(path string, docs []Doc) error {
+func SaveCSV(path string, docs []Document) error {
 	data, err := EncodeCSV(docs)
 	if err != nil {
 		return err
