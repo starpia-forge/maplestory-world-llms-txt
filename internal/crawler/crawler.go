@@ -19,7 +19,10 @@ import (
 const StartURL = "https://maplestoryworlds-creators.nexon.com/ko/docs/?postId=472"
 
 const (
-	navContainerSel     = "#App > main > div.contents_wrap > div.tree_view_container"
+	navContainerSel = "#App > main > div.contents_wrap > div.tree_view_container"
+	// contentOuterSel targets the container div used when opening curURL in a separate context
+	// per requirement: search for div elements with class text_content_container
+	contentOuterSel     = "div.text_content_container"
 	contentContainerSel = "#App > main > div.contents_wrap > div.renderContent > div.text_content_container > div.text_content"
 	titleSel            = "#App > main > div.contents_wrap > div.renderContent h1"
 )
@@ -158,7 +161,18 @@ func Run(headless bool, outPath, format string, clickDelay time.Duration, limit 
 			continue
 		}
 
-		doc := Document{PostID: postID, Title: title, URL: curURL, Content: html}
+		// 별도 컨텍스트에서 InnerHTML 수집 (요구사항)
+		var innerHTML string
+		_ = withRetry(backoff, 3, func() error {
+			ih, e := fetchInnerHTMLWithNewContext(ctx, curURL, 30*time.Second)
+			if e != nil {
+				return e
+			}
+			innerHTML = ih
+			return nil
+		})
+
+		doc := Document{PostID: postID, Title: title, URL: curURL, InnerHTML: innerHTML, Content: html}
 		docs = append(docs, doc)
 		visited[postID] = true
 		logger.LogParsedDoc(nil, doc.PostID, doc.Title, doc.URL)
