@@ -27,7 +27,7 @@ const (
 	titleSel            = "#App > main > div.contents_wrap > div.renderContent h1"
 )
 
-// Crawler는 실행마다 반복 전달하던 설정값을 보관해 재사용하기 위한 구조체입니다.
+// Crawler holds reusable configuration between runs.
 type Crawler struct {
 	ClickDelay     time.Duration
 	Limit          int
@@ -35,7 +35,7 @@ type Crawler struct {
 	Headless       bool
 }
 
-// Functional Options for Crawler
+// Option configures a Crawler.
 type Option func(*Crawler)
 
 // WithClickDelay sets the delay between clicks. Negative values are clamped to 0.
@@ -65,7 +65,7 @@ func WithOverallTimeout(d time.Duration) Option {
 // WithHeadless sets whether to run Chrome in headless mode.
 func WithHeadless(b bool) Option { return func(c *Crawler) { c.Headless = b } }
 
-// NewCrawler는 Functional Option으로 구성된 Crawler 인스턴스를 생성합니다.
+// NewCrawler constructs a Crawler using the provided functional options.
 func NewCrawler(opts ...Option) *Crawler {
 	c := &Crawler{}
 	for _, opt := range opts {
@@ -76,7 +76,8 @@ func NewCrawler(opts ...Option) *Crawler {
 	return c
 }
 
-// Run은 Crawler에 저장된 설정을 사용하여 크롤링을 수행하고 결과를 outPath에 저장합니다.
+// Run crawls the documentation starting at startURL and writes results to outPath
+// using the given format.
 func (c *Crawler) Run(outPath, format string, startURL string) error {
 	allocOpts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", c.Headless),
@@ -109,7 +110,7 @@ func (c *Crawler) Run(outPath, format string, startURL string) error {
 	var docs []Document
 	backoff := NewBackoff(500*time.Millisecond, 20*time.Second, 2.0, 0.2)
 
-	// 1) 확장 단계: 하위 항목을 가진 모든 닫힌 요소를 더 이상 없을 때까지 클릭
+	// 1) Expansion phase: click any closed node that has children until none remain.
 	for {
 		_ = scrollMenuToEnd(ctx)
 
@@ -120,7 +121,7 @@ func (c *Crawler) Run(outPath, format string, startURL string) error {
 
 		expanded := false
 		for _, n := range nodes {
-			// 조건: span.inactiveDot.isHavingChildren 이고 not .isHavingChildrenAndOpen
+			// Condition: span.inactiveDot.isHavingChildren and NOT .isHavingChildrenAndOpen
 			if strings.EqualFold(n.LocalName, "span") && hasAllClasses(n, "inactiveDot", "isHavingChildren") && !hasClass(n, "isHavingChildrenAndOpen") {
 				_ = chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
 					return dom.ScrollIntoViewIfNeeded().WithNodeID(n.NodeID).Do(ctx)
@@ -137,7 +138,8 @@ func (c *Crawler) Run(outPath, format string, startURL string) error {
 		}
 	}
 
-	// 2) 수집 단계: div.inactiveDepth 중 텍스트가 한 글자라도 있고, .activeParent 가 아닌 요소만 대상으로 클릭/수집
+	// 2) Collection phase: among div.inactiveDepth, target only nodes that have any visible text
+	// and are NOT .activeParent; click and collect.
 	_ = scrollMenuToEnd(ctx)
 	var leafNodes []*cdp.Node
 	if err := chromedp.Run(ctx, chromedp.Nodes(navContainerSel+" div.inactiveDepth", &leafNodes, chromedp.ByQueryAll)); err != nil {
@@ -148,7 +150,7 @@ func (c *Crawler) Run(outPath, format string, startURL string) error {
 		if hasClass(n, "activeParent") {
 			continue
 		}
-		// 텍스트 존재 여부 확인: outerHTML에서 태그를 제외한 가시 텍스트가 있는지 검사
+		// Check for visible text: inspect outerHTML and see if there is any visible text after stripping tags.
 		hasText := false
 		_ = chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
 			html, err := dom.GetOuterHTML().WithNodeID(n.NodeID).Do(ctx)
@@ -164,7 +166,7 @@ func (c *Crawler) Run(outPath, format string, startURL string) error {
 			continue
 		}
 
-		// 클릭
+		// Click the node
 		_ = chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
 			return dom.ScrollIntoViewIfNeeded().WithNodeID(n.NodeID).Do(ctx)
 		}))
@@ -173,7 +175,7 @@ func (c *Crawler) Run(outPath, format string, startURL string) error {
 		}
 		time.Sleep(c.ClickDelay)
 
-		// 문서 URL 판별
+		// Determine document URL
 		var curURL string
 		_ = chromedp.Run(ctx, chromedp.Location(&curURL))
 		postID, ok := ExtractPostIDFromURL(curURL)
@@ -181,7 +183,7 @@ func (c *Crawler) Run(outPath, format string, startURL string) error {
 			continue
 		}
 
-		// 내용 수집 (백오프 포함)
+		// Collect content (with backoff)
 		var title string
 		err := withRetry(backoff, 5, func() error {
 			if err := waitVisible(ctx, contentContainerSel, 30*time.Second); err != nil {
@@ -209,7 +211,7 @@ func (c *Crawler) Run(outPath, format string, startURL string) error {
 			continue
 		}
 
-		// 별도 컨텍스트에서 InnerHTML 수집 (요구사항)
+		// Fetch innerHTML in a separate context (per requirement)
 		var innerHTML string
 		_ = withRetry(backoff, 3, func() error {
 			ih, e := fetchInnerHTMLWithNewContext(ctx, curURL, 30*time.Second)
@@ -236,11 +238,6 @@ func (c *Crawler) Run(outPath, format string, startURL string) error {
 	}
 	return nil
 }
-
-// Run executes the crawl with the provided configuration and writes results to outPath.
-// Deprecated: use (*Crawler).Run with NewCrawler(clickDelay, limit, overallTimeout).
-// Note: deprecated Run wrapper has been removed. Use NewCrawler(...).Run(...) instead.
-
 func waitVisible(ctx context.Context, sel string, timeout time.Duration) error {
 	c, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
