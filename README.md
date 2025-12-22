@@ -24,4 +24,14 @@ The documents in this repository will be available for use in the dedicated AI a
 
 ## License
 
-Licensed under the [MIT License](/LICENSE).
+- **Documents**: The documents included in this project are processed content scraped from the [References](#references)
+  sites. Therefore, the copyright of the documents belongs to `Nexon`, and distribution may be discontinued at any time
+  upon their request.
+  The project used for document processing is `mdream`, which is licensed under the MIT License.
+- **Source Code**: The crawler created for site scraping is licensed under the [MIT License](/LICENSE).
+
+## References
+
+- [MapleStory World (English)](https://maplestoryworlds-creators.nexon.com/en)
+- [MapleStory World (Korean)](https://maplestoryworlds-creators.nexon.com/ko)
+- [mdream](https://github.com/harlan-zw/mdream)
