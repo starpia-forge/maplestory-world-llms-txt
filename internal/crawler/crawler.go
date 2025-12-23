@@ -78,7 +78,7 @@ func NewCrawler(opts ...Option) *Crawler {
 
 // Run crawls the documentation starting at startURL and writes results to outPath
 // using the given format.
-func (c *Crawler) Run(outPath, format string, startURL string) error {
+func (c *Crawler) Run(url string) ([]Document, error) {
 	allocOpts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", c.Headless),
 		chromedp.Flag("disable-gpu", true),
@@ -99,11 +99,11 @@ func (c *Crawler) Run(outPath, format string, startURL string) error {
 	}
 
 	// Navigate to start URL
-	if err := chromedp.Run(ctx, chromedp.Navigate(startURL)); err != nil {
-		return err
+	if err := chromedp.Run(ctx, chromedp.Navigate(url)); err != nil {
+		return []Document{}, err
 	}
 	if err := waitVisible(ctx, navContainerSel, 30*time.Second); err != nil {
-		return fmt.Errorf("navigation container not visible: %w", err)
+		return []Document{}, fmt.Errorf("navigation container not visible: %w", err)
 	}
 
 	visited := make(map[string]bool)
@@ -116,7 +116,7 @@ func (c *Crawler) Run(outPath, format string, startURL string) error {
 
 		var nodes []*cdp.Node
 		if err := chromedp.Run(ctx, chromedp.Nodes(navContainerSel+" *", &nodes, chromedp.ByQueryAll)); err != nil {
-			return fmt.Errorf("query nodes: %w", err)
+			return []Document{}, fmt.Errorf("query nodes: %w", err)
 		}
 
 		expanded := false
@@ -143,7 +143,7 @@ func (c *Crawler) Run(outPath, format string, startURL string) error {
 	_ = scrollMenuToEnd(ctx)
 	var leafNodes []*cdp.Node
 	if err := chromedp.Run(ctx, chromedp.Nodes(navContainerSel+" div.inactiveDepth", &leafNodes, chromedp.ByQueryAll)); err != nil {
-		return fmt.Errorf("query leaf nodes: %w", err)
+		return []Document{}, fmt.Errorf("query leaf nodes: %w", err)
 	}
 
 	for _, n := range leafNodes {
@@ -206,7 +206,7 @@ func (c *Crawler) Run(outPath, format string, startURL string) error {
 		}
 
 		if !isAllowedDocURL(curURL) {
-			_ = chromedp.Run(ctx, chromedp.Navigate(startURL))
+			_ = chromedp.Run(ctx, chromedp.Navigate(url))
 			_ = waitVisible(ctx, navContainerSel, 15*time.Second)
 			continue
 		}
@@ -231,12 +231,7 @@ func (c *Crawler) Run(outPath, format string, startURL string) error {
 			break
 		}
 	}
-
-	// Save result
-	if err := saveOutput(outPath, format, docs); err != nil {
-		return err
-	}
-	return nil
+	return docs, nil
 }
 func waitVisible(ctx context.Context, sel string, timeout time.Duration) error {
 	c, cancel := context.WithTimeout(ctx, timeout)
