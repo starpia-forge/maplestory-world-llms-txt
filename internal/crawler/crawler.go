@@ -149,16 +149,19 @@ func (c *Crawler) Run(url string) ([]Document, error) {
 		}
 		// Check for visible text: inspect outerHTML and see if there is any visible text after stripping tags.
 		hasText := false
-		_ = chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+		err := chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
 			html, err := dom.GetOuterHTML().WithNodeID(n.NodeID).Do(ctx)
 			if err != nil {
-				return nil
+				return err
 			}
 			if hasAnyTextInHTML(html) {
 				hasText = true
 			}
 			return nil
 		}))
+		if err != nil {
+			return []Document{}, fmt.Errorf("query node text: %w", err)
+		}
 		if !hasText {
 			continue
 		}
