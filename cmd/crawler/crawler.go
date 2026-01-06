@@ -56,19 +56,18 @@ func main() {
 		}
 		log.Printf("crawled %d documents from %q", len(docs), targetURL)
 
-		rawFileName := fmt.Sprintf("%s.raw", outFileName)
-		if err := crawler.SaveDocumentFile(docs, rawFileName); err != nil {
+		htmlFileName := fmt.Sprintf("%s.html", outFileName)
+		if err := crawler.SaveDocumentFile(docs, htmlFileName); err != nil {
 			log.Fatalf("SaveDocumentFile error: %v", err)
 		}
-		log.Printf("document to %s", rawFileName)
+		log.Printf("document to %s", htmlFileName)
 
-		if err := mdream(rawFileName, outFileName); err != nil {
+		if err := mdream(htmlFileName, outFileName); err != nil {
 			log.Fatalf("mdream error: %v", err)
 		}
 		log.Printf("converted to %s", outFileName)
 	}
 }
-
 func mdream(inputFileName, outFileName string) error {
 	inputFile, err := os.Open(inputFileName)
 	if err != nil {
