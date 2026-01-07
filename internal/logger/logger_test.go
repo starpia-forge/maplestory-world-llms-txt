@@ -30,7 +30,7 @@ func TestLogParsedDoc_EmitsInfoWithExpectedAttrs(t *testing.T) {
 	h := &capHandler{}
 	l := slog.New(h)
 
-	LogParsedDoc(l, "123", "Hello", "https://example.com/docs?postId=123")
+	LogParsedDoc(l, "Hello", "https://example.com/docs?postId=123")
 
 	if len(h.recs) != 1 {
 		t.Fatalf("expected 1 record, got %d", len(h.recs))
@@ -43,7 +43,7 @@ func TestLogParsedDoc_EmitsInfoWithExpectedAttrs(t *testing.T) {
 		t.Fatalf("expected message 'parsed_doc', got %q", rec.Message)
 	}
 	got := attrsToMap(rec)
-	if got["postId"] != "123" || got["title"] != "Hello" || got["url"] != "https://example.com/docs?postId=123" {
+	if got["title"] != "Hello" || got["url"] != "https://example.com/docs?postId=123" {
 		t.Fatalf("unexpected attrs: %+v", got)
 	}
 }

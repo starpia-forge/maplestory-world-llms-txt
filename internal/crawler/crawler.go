@@ -301,7 +301,7 @@ func (c *Crawler) Run(url string) ([]Document, error) {
 		doc := Document{Title: title, URL: curURL, InnerHTML: innerHTML, Content: ""}
 		docs = append(docs, doc)
 		visited[curURL] = true
-		logger.LogParsedDoc(nil, "", doc.Title, doc.URL)
+		logger.LogParsedDoc(nil, doc.Title, doc.URL)
 
 		if c.Limit > 0 && len(visited) >= c.Limit {
 			break
