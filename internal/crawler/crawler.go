@@ -135,42 +135,50 @@ func (c *Crawler) Run(url string) ([]Document, error) {
 		}
 	}
 
-	// 2) Collection phase: among div.inactiveDepth, target only nodes that have any visible text
-	// and are NOT .activeParent; click and collect.
-	_ = scrollMenuToEnd(ctx)
-	var leafNodes []*cdp.Node
-	if err := chromedp.Run(ctx, chromedp.Nodes(navContainerSel+" div.inactiveDepth", &leafNodes, chromedp.ByQueryAll)); err != nil {
-		return []Document{}, fmt.Errorf("query leaf nodes: %w", err)
+	// 2) Build list of target elements' Full XPaths (from expanded tree)
+	xPaths, err := collectLeafXPaths(ctx)
+	if err != nil {
+		return []Document{}, fmt.Errorf("collect xPaths: %w", err)
 	}
 
-	for _, n := range leafNodes {
-		if hasClass(n, "activeParent") {
+	// 3) Iterate over collected XPaths and collect content per requirement
+	for _, xPath := range xPaths {
+		// Navigate to start URL anew
+		if err := chromedp.Run(ctx, chromedp.Navigate(url)); err != nil {
 			continue
 		}
-		// Check for visible text: inspect outerHTML and see if there is any visible text after stripping tags.
-		hasText := false
-		err := chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
-			html, err := dom.GetOuterHTML().WithNodeID(n.NodeID).Do(ctx)
-			if err != nil {
-				return err
-			}
-			if hasAnyTextInHTML(html) {
-				hasText = true
-			}
-			return nil
-		}))
-		if err != nil {
-			return []Document{}, fmt.Errorf("query node text: %w", err)
-		}
-		if !hasText {
+		if err := waitVisible(ctx, navContainerSel, 30*time.Second); err != nil {
 			continue
 		}
 
-		// Click the node
-		_ = chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
-			return dom.ScrollIntoViewIfNeeded().WithNodeID(n.NodeID).Do(ctx)
-		}))
-		if err := chromedp.Run(ctx, chromedp.MouseClickNode(n)); err != nil {
+		// Expand all nodes again (same logic as phase 1)
+		for {
+			_ = scrollMenuToEnd(ctx)
+			var nodes []*cdp.Node
+			if err := chromedp.Run(ctx, chromedp.Nodes(navContainerSel+" *", &nodes, chromedp.ByQueryAll)); err != nil {
+				break
+			}
+			expanded := false
+			for _, n := range nodes {
+				if strings.EqualFold(n.LocalName, "span") && hasAllClasses(n, "inactiveDot", "isHavingChildren") && !hasClass(n, "isHavingChildrenAndOpen") {
+					_ = chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+						return dom.ScrollIntoViewIfNeeded().WithNodeID(n.NodeID).Do(ctx)
+					}))
+					if err := chromedp.Run(ctx, chromedp.MouseClickNode(n)); err != nil {
+						continue
+					}
+					time.Sleep(c.ClickDelay)
+					expanded = true
+				}
+			}
+			if !expanded {
+				break
+			}
+		}
+
+		// Find the node by XPath and click it (via JS)
+		ok, _ := clickByXPathJS(ctx, xPath)
+		if !ok {
 			continue
 		}
 		time.Sleep(c.ClickDelay)
@@ -191,13 +199,11 @@ func (c *Crawler) Run(url string) ([]Document, error) {
 			if err := waitVisible(ctx, titleSel, 10*time.Second); err != nil {
 				return err
 			}
-			var t string
-			if err := chromedp.Run(ctx,
-				chromedp.Text(titleSel, &t, chromedp.NodeVisible, chromedp.ByQuery),
-			); err != nil {
+			var tt string
+			if err := chromedp.Run(ctx, chromedp.Text(titleSel, &tt, chromedp.NodeVisible, chromedp.ByQuery)); err != nil {
 				return err
 			}
-			title = strings.TrimSpace(t)
+			title = strings.TrimSpace(tt)
 			return nil
 		})
 		if err != nil {
